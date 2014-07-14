@@ -8,7 +8,7 @@ Example usage:
 
 .. sourcecode:: python
 
-    >>> import csvsort
+    >>> from csvsort import csvsort
     >>> # sort this CSV on the 4th and 2nd columns (columns are 0 indexed)
     >>> csvsort('test1.csv', [4,2])  
     >>> # sort this CSV with no header on 3rd column and save results to separate file
@@ -35,6 +35,6 @@ Install
 
 .. sourcecode:: bash
 
-    pip install csvsort
+    $ pip install csvsort
 
 ..
