@@ -14,12 +14,16 @@ if not os.path.exists(TMP_DIR):
     os.mkdir(TMP_DIR)
 
 
+class CsvSortError(Exception):
+    pass
+
+
 def csvsort(input_filename, columns, output_filename=None, max_size=100, has_header=True, delimiter=',', quoting=csv.QUOTE_MINIMAL):
     """Sort the CSV file on disk rather than in memory
     The merge sort algorithm is used to break the file into smaller sub files and 
 
     input_filename: the CSV filename to sort
-    columns: a list of column indices (0 based) to sort on
+    columns: a list of column to sort on (can be 0 based indices or header keys)
     output_filename: optional filename for sorted file. If not given then input file will be overriden.
     max_size: the maximum size (in MB) of CSV file to load in memory at once
     has_header: whether the CSV contains a header to keep separated from sorting
@@ -31,6 +35,8 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
     else:
         header = None
 
+    columns = parse_columns(columns, header)
+
     filenames = csvsplit(reader, max_size)
     print 'Merging %d splits' % len(filenames)
     for filename in filenames:
@@ -41,6 +47,26 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
     if header:
         writer.writerow(header)
     generate_result(writer, sorted_filename)
+
+
+def parse_columns(columns, header):
+    """check the provided column headers
+    """
+    for i, column in enumerate(columns):
+        if isinstance(column, int):
+            if header:
+                if column >= len(header):
+                    raise CsvSortError('Column index is out of range: "{}"'.format(column))
+        else:
+            # find index of column from header
+            if header is None:
+                raise CsvSortError('CSV needs a header to find index of this column name: "{}"'.format(column))
+            else:
+                if column in header:
+                    columns[i] = header.index(column)
+                else:
+                    raise CsvSortError('Column name is not found in header: "{}"'.format(column))
+    return columns
 
 
 def generate_result(writer, sorted_filename): 
@@ -126,8 +152,7 @@ def mergesort(sorted_filenames, columns, nway=2):
 
 def main():
     parser = OptionParser()
-    parser.add_option('-c', '--column', dest='columns', action='append', type='int', help='index of CSV to sort on')
-    #parser.add_option('-f', '--field', dest='field', action='append', help='column name of CSV to sort on')
+    parser.add_option('-c', '--column', dest='columns', action='append', help='column of CSV to sort on')
     parser.add_option('-s', '--size', '-s', dest='max_size', type='float', default=100, help='maximum size of each split CSV file in MB (default 100)')
     parser.add_option('-n', '--no-header', dest='has_header', action='store_false', default=True, help='set CSV file has no header')
     parser.add_option('-d', '--delimiter', default=',', help='set CSV delimiter (default ",")')
@@ -140,6 +165,7 @@ def main():
     else:
         # escape backslashes
         args.delimiter = args.delimiter.decode("string_escape")
+        args.columns = [int(column) if column.isdigit() else column for column in args.columns]
         csvsort(input_files[0], columns=args.columns, max_size=args.max_size, has_header=args.has_header, delimiter=args.delimiter)
 
  
