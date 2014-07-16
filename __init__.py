@@ -1,5 +1,4 @@
 
-
 import os
 import sys
 import csv
@@ -9,7 +8,7 @@ from optparse import OptionParser
 
 
 # temporary directory to store the sub-files
-TMP_DIR = '.csvsort'
+TMP_DIR = '.csvsort.%d' % os.getpid()
 if not os.path.exists(TMP_DIR):
     os.mkdir(TMP_DIR)
 
@@ -42,11 +41,19 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
     for filename in filenames:
         memorysort(filename, columns)
     sorted_filename = mergesort(filenames, columns)
-  
+
+    # XXX make more efficient by passing quoting, delimiter, and moving result
+    # generate the final output file
     writer = csv.writer(open(output_filename or input_filename, 'w'), delimiter=delimiter, quoting=quoting)
     if header:
         writer.writerow(header)
-    generate_result(writer, sorted_filename)
+    for row in csv.reader(open(sorted_filename)):
+        writer.writerow(row)
+    os.remove(sorted_filename)
+    try:
+        os.rmdir(TMP_DIR)
+    except OSError:
+        pass
 
 
 def parse_columns(columns, header):
@@ -67,18 +74,6 @@ def parse_columns(columns, header):
                 else:
                     raise CsvSortError('Column name is not found in header: "{}"'.format(column))
     return columns
-
-
-def generate_result(writer, sorted_filename): 
-    """generate final output file
-    """
-    for row in csv.reader(open(sorted_filename)):
-        writer.writerow(row)
-    os.remove(sorted_filename)
-    try:
-        os.rmdir(TMP_DIR)
-    except OSError:
-        pass
 
 
 def csvsplit(reader, max_size):
@@ -136,7 +131,6 @@ def mergesort(sorted_filenames, columns, nway=2):
         readers = map(open, merge_filenames)
 
         output_filename = os.path.join(TMP_DIR, 'merge%d.csv' % merge_n)
-        print 'create', output_filename
         writer = csv.writer(open(output_filename, 'w'))
         merge_n += 1
 
@@ -145,7 +139,6 @@ def mergesort(sorted_filenames, columns, nway=2):
         
         sorted_filenames.append(output_filename)
         for filename in merge_filenames:
-            print 'delete', filename
             os.remove(filename)
     return sorted_filenames[0]
 
