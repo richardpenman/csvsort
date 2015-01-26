@@ -6,7 +6,7 @@ def read(filename):
 
 setup(
     name='csvsort', 
-    version='1.0',
+    version='1.2',
     packages=['csvsort'],
     package_dir={'csvsort' : '.'}, 
     author='Richard Penman',
