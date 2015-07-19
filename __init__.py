@@ -28,27 +28,31 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
     has_header: whether the CSV contains a header to keep separated from sorting
     delimiter: character used to separate fields, default ','
     """
-    reader = csv.reader(open(input_filename), delimiter=delimiter)
-    if has_header:
-        header = reader.next()
-    else:
-        header = None
+    with open(input_filename) as input_fp:
+        reader = csv.reader(input_fp, delimiter=delimiter)
+        if has_header:
+            header = reader.next()
+        else:
+            header = None
 
-    columns = parse_columns(columns, header)
+        columns = parse_columns(columns, header)
 
-    filenames = csvsplit(reader, max_size)
-    print 'Merging %d splits' % len(filenames)
-    for filename in filenames:
-        memorysort(filename, columns)
-    sorted_filename = mergesort(filenames, columns)
+        filenames = csvsplit(reader, max_size)
+        print 'Merging %d splits' % len(filenames)
+        for filename in filenames:
+            memorysort(filename, columns)
+        sorted_filename = mergesort(filenames, columns)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
     # generate the final output file
-    writer = csv.writer(open(output_filename or input_filename, 'w'), delimiter=delimiter, quoting=quoting)
-    if header:
-        writer.writerow(header)
-    for row in csv.reader(open(sorted_filename)):
-        writer.writerow(row)
+    with open(output_filename or input_filename, 'wb') as output_fp:
+        writer = csv.writer(output_fp, delimiter=delimiter, quoting=quoting)
+        if header:
+            writer.writerow(header)
+        with open(sorted_filename) as sorted_fp:
+            for row in csv.reader(sorted_fp):
+                writer.writerow(row)
+
     os.remove(sorted_filename)
     try:
         os.rmdir(TMP_DIR)
@@ -88,7 +92,7 @@ def csvsplit(reader, max_size):
     for row in reader:
         if writer is None:
             filename = os.path.join(TMP_DIR, 'split%d.csv' % len(split_filenames))
-            writer = csv.writer(open(filename, 'w'))
+            writer = csv.writer(open(filename, 'wb'))
             split_filenames.append(filename)
 
         writer.writerow(row)
@@ -102,11 +106,13 @@ def csvsplit(reader, max_size):
 def memorysort(filename, columns):
     """Sort this CSV file in memory on the given columns
     """
-    rows = [row for row in csv.reader(open(filename))]
+    with open(filename) as input_fp:
+        rows = [row for row in csv.reader(input_fp)]
     rows.sort(key=lambda row: get_key(row, columns))
-    writer = csv.writer(open(filename, 'wb'))
-    for row in rows:
-        writer.writerow(row)
+    with open(filename, 'wb') as output_fp:
+        writer = csv.writer(output_fp)
+        for row in rows:
+            writer.writerow(row)
 
 
 def get_key(row, columns):
@@ -118,8 +124,9 @@ def get_key(row, columns):
 def decorated_csv(filename, columns):
     """Iterator to sort CSV rows
     """
-    for row in csv.reader(open(filename)):
-        yield get_key(row, columns), row
+    with open(filename) as fp:
+        for row in csv.reader(fp):
+            yield get_key(row, columns), row
 
 
 def mergesort(sorted_filenames, columns, nway=2):
@@ -131,13 +138,14 @@ def mergesort(sorted_filenames, columns, nway=2):
         readers = map(open, merge_filenames)
 
         output_filename = os.path.join(TMP_DIR, 'merge%d.csv' % merge_n)
-        writer = csv.writer(open(output_filename, 'w'))
-        merge_n += 1
-
-        for _, row in heapq.merge(*[decorated_csv(filename, columns) for filename in merge_filenames]):
-            writer.writerow(row)
-        
+        with open(output_filename, 'wb') as output_fp:
+            writer = csv.writer(output_fp)
+            merge_n += 1
+            for _, row in heapq.merge(*[decorated_csv(filename, columns) for filename in merge_filenames]):
+                writer.writerow(row)
         sorted_filenames.append(output_filename)
+
+        del readers
         for filename in merge_filenames:
             os.remove(filename)
     return sorted_filenames[0]
