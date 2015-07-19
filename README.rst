@@ -9,22 +9,12 @@ Example usage:
 .. sourcecode:: python
 
     >>> from csvsort import csvsort
-    >>> # sort this CSV on the 4th and 2nd columns (columns are 0 indexed)
+    >>> # sort this CSV on the 5th and 3rd columns (columns are 0 indexed)
     >>> csvsort('test1.csv', [4,2])  
-    >>> # sort this CSV with no header on 3rd column and save results to separate file
+    >>> # sort this CSV with no header on 4th column and save results to separate file
     >>> csvsort('test2.csv', [3], output_file='test3.csv', has_header=False)  
-
-..
-
-csvsort can also be used from the command line:
-
-.. sourcecode:: bash
-
-    $ # sort this CSV on 0th column
-    $ python csvsort.py test1.tsv --coloumn=0
-    
-    $ # sort this tab separated file (TSV) on 3rd and 1st columns
-    $ python csvsort.py test3.tsv --delimiter='\t' -c 3 -c 1
+    >>> # sort this TSV on the first column and use a maximum of 10MB per split
+    >>> csvsort('test3.tsv', [3], max_size=10, delimiter='\t')  
 
 ..
 
