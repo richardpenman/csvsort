@@ -2,9 +2,12 @@
 CSV Sort
 ========
 
-Sort a CSV file on disk rather than in memory. The merge sort algorithm is used to break up the original file into smaller chunks, sort these in memory, and then merge these sorted files.
+Sort a CSV file on disk to save memory. The merge sort algorithm is used to break up the original file into smaller chunks, sort these in memory, and then merge these sorted files.
 
-Example usage:
+
+=============
+Example usage
+=============
 
 .. sourcecode:: python
 
