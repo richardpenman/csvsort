@@ -2,7 +2,7 @@
 CSV Sort
 ========
 
-Sort a CSV file on disk to save memory. The merge sort algorithm is used to break up the original file into smaller chunks, sort these in memory, and then merge these sorted files.
+For sorting CSV files on disk that do not fit into memory. The merge sort algorithm is used to break up the original file into smaller chunks, sort these in memory, and then merge these sorted files.
 
 
 =============
@@ -17,7 +17,10 @@ Example usage
     >>> # sort this CSV with no header on 4th column and save results to separate file
     >>> csvsort('test2.csv', [3], output_file='test3.csv', has_header=False)  
     >>> # sort this TSV on the first column and use a maximum of 10MB per split
-    >>> csvsort('test3.tsv', [3], max_size=10, delimiter='\t')  
+    >>> csvsort('test3.tsv', [0], max_size=10, delimiter='\t')  
+    >>> # sort this CSV on the first column and force quotes around every field (default is csv.QUOTE_MINIMAL)
+    >>> import csv
+    >>> csvsort('test4.csv', [0], quoting=csv.QUOTE_ALL) 
 
 ..
 
