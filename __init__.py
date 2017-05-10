@@ -1,33 +1,45 @@
-
+import tempfile
 import os
 import sys
 import csv
-csv.field_size_limit(sys.maxint)
 import heapq
 from optparse import OptionParser
-
-
-# temporary directory to store the sub-files
-TMP_DIR = '.csvsort.%d' % os.getpid()
-if not os.path.exists(TMP_DIR):
-    os.mkdir(TMP_DIR)
+csv.field_size_limit(sys.maxint)
 
 
 class CsvSortError(Exception):
     pass
 
 
-def csvsort(input_filename, columns, output_filename=None, max_size=100, has_header=True, delimiter=',', quoting=csv.QUOTE_MINIMAL):
-    """Sort the CSV file on disk rather than in memory
-    The merge sort algorithm is used to break the file into smaller sub files and 
+def csvsort(input_filename,
+            columns,
+            output_filename=None,
+            max_size=100,
+            has_header=True,
+            delimiter=',',
+            show_progress=False,
+            quoting=csv.QUOTE_MINIMAL):
+    """Sort the CSV file on disk rather than in memory.
 
-    input_filename: the CSV filename to sort
-    columns: a list of column to sort on (can be 0 based indices or header keys)
-    output_filename: optional filename for sorted file. If not given then input file will be overriden.
-    max_size: the maximum size (in MB) of CSV file to load in memory at once
-    has_header: whether the CSV contains a header to keep separated from sorting
-    delimiter: character used to separate fields, default ','
+    The merge sort algorithm is used to break the file into smaller sub files
+
+    Args:
+        input_filename: the CSV filename to sort.
+        columns: a list of columns to sort on (can be 0 based indices or header
+            keys).
+        output_filename: optional filename for sorted file. If not given then
+            input file will be overriden.
+        max_size: the maximum size (in MB) of CSV file to load in memory at
+            once.
+        has_header: whether the CSV contains a header to keep separated from
+            sorting.
+        delimiter: character used to separate fields, default ','.
+        show_progress (Boolean): A flag whether or not to show progress.
+            The default is False, which does not print any merge information.
+        quoting: How much quoting is needed in the final CSV file.  Default is
+            csv.QUOTE_MINIMAL.
     """
+
     with open(input_filename) as input_fp:
         reader = csv.reader(input_fp, delimiter=delimiter)
         if has_header:
@@ -38,7 +50,8 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
         columns = parse_columns(columns, header)
 
         filenames = csvsplit(reader, max_size)
-        print 'Merging %d splits' % len(filenames)
+        if show_progress:
+            print 'Merging %d splits' % len(filenames)
         for filename in filenames:
             memorysort(filename, columns)
         sorted_filename = mergesort(filenames, columns)
@@ -54,10 +67,6 @@ def csvsort(input_filename, columns, output_filename=None, max_size=100, has_hea
                 writer.writerow(row)
 
     os.remove(sorted_filename)
-    try:
-        os.rmdir(TMP_DIR)
-    except OSError:
-        pass
 
 
 def parse_columns(columns, header):
@@ -67,23 +76,27 @@ def parse_columns(columns, header):
         if isinstance(column, int):
             if header:
                 if column >= len(header):
-                    raise CsvSortError('Column index is out of range: "{}"'.format(column))
+                    raise CsvSortError(
+                        'Column index is out of range: "{}"'.format(column))
         else:
             # find index of column from header
             if header is None:
-                raise CsvSortError('CSV needs a header to find index of this column name: "{}"'.format(column))
+                raise CsvSortError(
+                    'CSV needs a header to find index of this column name:' +
+                    ' "{}"'.format(column))
             else:
                 if column in header:
                     columns[i] = header.index(column)
                 else:
-                    raise CsvSortError('Column name is not found in header: "{}"'.format(column))
+                    raise CsvSortError(
+                        'Column name is not in header: "{}"'.format(column))
     return columns
 
 
 def csvsplit(reader, max_size):
-    """Split into smaller CSV files of maximum size and return the list of filenames
+    """Split into smaller CSV files of maximum size and return the filenames.
     """
-    max_size = max_size * 1024 * 1024 # convert to bytes
+    max_size = max_size * 1024 * 1024  # convert to bytes
     writer = None
     current_size = 0
     split_filenames = []
@@ -91,9 +104,9 @@ def csvsplit(reader, max_size):
     # break CSV file into smaller merge files
     for row in reader:
         if writer is None:
-            filename = os.path.join(TMP_DIR, 'split%d.csv' % len(split_filenames))
-            writer = csv.writer(open(filename, 'wb'))
-            split_filenames.append(filename)
+            ntf = tempfile.NamedTemporaryFile(delete=False)
+            writer = csv.writer(ntf)
+            split_filenames.append(ntf.name)
 
         writer.writerow(row)
         current_size += sys.getsizeof(row)
@@ -134,18 +147,18 @@ def mergesort(sorted_filenames, columns, nway=2):
     """
     merge_n = 0
     while len(sorted_filenames) > 1:
-        merge_filenames, sorted_filenames = sorted_filenames[:nway], sorted_filenames[nway:]
-        readers = map(open, merge_filenames)
+        merge_filenames, sorted_filenames = \
+           sorted_filenames[:nway], sorted_filenames[nway:]
 
-        output_filename = os.path.join(TMP_DIR, 'merge%d.csv' % merge_n)
-        with open(output_filename, 'wb') as output_fp:
+        with tempfile.NamedTemporaryFile(delete=False) as output_fp:
             writer = csv.writer(output_fp)
             merge_n += 1
-            for _, row in heapq.merge(*[decorated_csv(filename, columns) for filename in merge_filenames]):
+            for _, row in heapq.merge(*[decorated_csv(filename, columns)
+                                        for filename in merge_filenames]):
                 writer.writerow(row)
-        sorted_filenames.append(output_filename)
 
-        del readers
+            sorted_filenames.append(output_fp.name)
+
         for filename in merge_filenames:
             os.remove(filename)
     return sorted_filenames[0]
@@ -153,10 +166,31 @@ def mergesort(sorted_filenames, columns, nway=2):
 
 def main():
     parser = OptionParser()
-    parser.add_option('-c', '--column', dest='columns', action='append', help='column of CSV to sort on')
-    parser.add_option('-s', '--size', '-s', dest='max_size', type='float', default=100, help='maximum size of each split CSV file in MB (default 100)')
-    parser.add_option('-n', '--no-header', dest='has_header', action='store_false', default=True, help='set CSV file has no header')
-    parser.add_option('-d', '--delimiter', default=',', help='set CSV delimiter (default ",")')
+    parser.add_option(
+        '-c',
+        '--column',
+        dest='columns',
+        action='append',
+        help='column of CSV to sort on')
+    parser.add_option(
+        '-s',
+        '--size',
+        dest='max_size',
+        type='float',
+        default=100,
+        help='maximum size of each split CSV file in MB (default 100)')
+    parser.add_option(
+        '-n',
+        '--no-header',
+        dest='has_header',
+        action='store_false',
+        default=True,
+        help='set CSV file has no header')
+    parser.add_option(
+        '-d',
+        '--delimiter',
+        default=',',
+        help='set CSV delimiter (default ",")')
     args, input_files = parser.parse_args()
 
     if not input_files:
@@ -166,9 +200,15 @@ def main():
     else:
         # escape backslashes
         args.delimiter = args.delimiter.decode("string_escape")
-        args.columns = [int(column) if column.isdigit() else column for column in args.columns]
-        csvsort(input_files[0], columns=args.columns, max_size=args.max_size, has_header=args.has_header, delimiter=args.delimiter)
+        args.columns = [int(column) if column.isdigit() else column
+                        for column in args.columns]
+        csvsort(
+            input_files[0],
+            columns=args.columns,
+            max_size=args.max_size,
+            has_header=args.has_header,
+            delimiter=args.delimiter)
 
- 
+
 if __name__ == '__main__':
     main()
