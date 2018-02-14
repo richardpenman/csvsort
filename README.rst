@@ -29,8 +29,11 @@ Example usage
 Install
 =======
 
+Supports python 2 & 3:
+
 .. sourcecode:: bash
 
     $ pip install csvsort
+    $ pip3 install csvsort
 
 ..
