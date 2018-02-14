@@ -1,10 +1,8 @@
-import tempfile
-import os
-import sys
-import csv
-import heapq
+# -*- coding: utf-8 -*-
+
+import csv, heapq, logging, os, sys, tempfile
 from optparse import OptionParser
-csv.field_size_limit(sys.maxint)
+csv.field_size_limit(sys.maxsize)
 
 
 class CsvSortError(Exception):
@@ -43,7 +41,7 @@ def csvsort(input_filename,
     with open(input_filename) as input_fp:
         reader = csv.reader(input_fp, delimiter=delimiter)
         if has_header:
-            header = reader.next()
+            header = next(reader)
         else:
             header = None
 
@@ -51,14 +49,14 @@ def csvsort(input_filename,
 
         filenames = csvsplit(reader, max_size)
         if show_progress:
-            print 'Merging %d splits' % len(filenames)
+            logging.info('Merging %d splits' % len(filenames))
         for filename in filenames:
             memorysort(filename, columns)
         sorted_filename = mergesort(filenames, columns)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
     # generate the final output file
-    with open(output_filename or input_filename, 'wb') as output_fp:
+    with open(output_filename or input_filename, 'w') as output_fp:
         writer = csv.writer(output_fp, delimiter=delimiter, quoting=quoting)
         if header:
             writer.writerow(header)
@@ -104,7 +102,7 @@ def csvsplit(reader, max_size):
     # break CSV file into smaller merge files
     for row in reader:
         if writer is None:
-            ntf = tempfile.NamedTemporaryFile(delete=False)
+            ntf = tempfile.NamedTemporaryFile(delete=False, mode='w')
             writer = csv.writer(ntf)
             split_filenames.append(ntf.name)
 
@@ -122,7 +120,7 @@ def memorysort(filename, columns):
     with open(filename) as input_fp:
         rows = [row for row in csv.reader(input_fp)]
     rows.sort(key=lambda row: get_key(row, columns))
-    with open(filename, 'wb') as output_fp:
+    with open(filename, 'w') as output_fp:
         writer = csv.writer(output_fp)
         for row in rows:
             writer.writerow(row)
