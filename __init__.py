@@ -148,7 +148,7 @@ def mergesort(sorted_filenames, columns, nway=2):
         merge_filenames, sorted_filenames = \
            sorted_filenames[:nway], sorted_filenames[nway:]
 
-        with tempfile.NamedTemporaryFile(delete=False) as output_fp:
+        with tempfile.NamedTemporaryFile(delete=False, mode='w') as output_fp:
             writer = csv.writer(output_fp)
             merge_n += 1
             for _, row in heapq.merge(*[decorated_csv(filename, columns)
@@ -197,7 +197,7 @@ def main():
         parser.error('Which columns should be sorted on?')
     else:
         # escape backslashes
-        args.delimiter = args.delimiter.decode("string_escape")
+        args.delimiter = args.delimiter.decode('string_escape')
         args.columns = [int(column) if column.isdigit() else column
                         for column in args.columns]
         csvsort(
