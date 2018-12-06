@@ -118,7 +118,7 @@ def memorysort(filename, columns):
     """Sort this CSV file in memory on the given columns
     """
     with open(filename) as input_fp:
-        rows = [row for row in csv.reader(input_fp)]
+        rows = [row for row in csv.reader(input_fp) if row]
     rows.sort(key=lambda row: get_key(row, columns))
     with open(filename, 'w') as output_fp:
         writer = csv.writer(output_fp)
