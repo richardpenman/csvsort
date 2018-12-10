@@ -15,7 +15,7 @@ Example usage
     >>> # sort this CSV on the 5th and 3rd columns (columns are 0 indexed)
     >>> csvsort('test1.csv', [4,2])  
     >>> # sort this CSV with no header on 4th column and save results to separate file
-    >>> csvsort('test2.csv', [3], output_file='test3.csv', has_header=False)  
+    >>> csvsort('test2.csv', [3], output_filename='test3.csv', has_header=False)  
     >>> # sort this TSV on the first column and use a maximum of 10MB per split
     >>> csvsort('test3.tsv', [0], max_size=10, delimiter='\t')  
     >>> # sort this CSV on the first column and force quotes around every field (default is csv.QUOTE_MINIMAL)
