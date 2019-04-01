@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import csv, heapq, logging, os, sys, tempfile
+import csv, heapq, logging, multiprocessing, os, sys, tempfile
 from optparse import OptionParser
 csv.field_size_limit(sys.maxsize)
 
@@ -16,6 +16,7 @@ def csvsort(input_filename,
             has_header=True,
             delimiter=',',
             show_progress=False,
+            parallel=True,
             quoting=csv.QUOTE_MINIMAL):
     """Sort the CSV file on disk rather than in memory.
 
@@ -50,8 +51,15 @@ def csvsort(input_filename,
         filenames = csvsplit(reader, max_size)
         if show_progress:
             logging.info('Merging %d splits' % len(filenames))
-        for filename in filenames:
-            memorysort(filename, columns)
+
+        if parallel:
+            concurrency = multiprocessing.cpu_count()
+            with multiprocessing.Pool(processes=concurrency) as pool:
+                map_args = [(filename, columns) for filename in filenames]
+                pool.starmap(memorysort, map_args)
+        else:
+            for filename in filenames:
+                memorysort(filename, columns)
         sorted_filename = mergesort(filenames, columns)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
