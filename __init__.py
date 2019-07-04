@@ -2,7 +2,7 @@
 
 import csv, heapq, logging, multiprocessing, os, sys, tempfile
 from optparse import OptionParser
-csv.field_size_limit(sys.maxsize)
+csv.field_size_limit(2**30) # can't use sys.maxsize because of Windows error
 
 
 class CsvSortError(Exception):
