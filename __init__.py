@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import csv, heapq, logging, multiprocessing, os, sys, tempfile
+if sys.version_info.major == 2:
+    from io import open
 from optparse import OptionParser
 csv.field_size_limit(2**30) # can't use sys.maxsize because of Windows error
 
@@ -17,7 +19,8 @@ def csvsort(input_filename,
             delimiter=',',
             show_progress=False,
             parallel=True,
-            quoting=csv.QUOTE_MINIMAL):
+            quoting=csv.QUOTE_MINIMAL,
+            encoding=None):
     """Sort the CSV file on disk rather than in memory.
 
     The merge sort algorithm is used to break the file into smaller sub files
@@ -37,9 +40,11 @@ def csvsort(input_filename,
             The default is False, which does not print any merge information.
         quoting: How much quoting is needed in the final CSV file.  Default is
             csv.QUOTE_MINIMAL.
+        encoding: The name of the encoding to use when opening or writing the
+            csv files. Default is None which uses the system default.
     """
 
-    with open(input_filename) as input_fp:
+    with open(input_filename, newline='', encoding=encoding) as input_fp:
         reader = csv.reader(input_fp, delimiter=delimiter)
         if has_header:
             header = next(reader)
@@ -55,20 +60,20 @@ def csvsort(input_filename,
         if parallel:
             concurrency = multiprocessing.cpu_count()
             with multiprocessing.Pool(processes=concurrency) as pool:
-                map_args = [(filename, columns) for filename in filenames]
+                map_args = [(filename, columns, encoding) for filename in filenames]
                 pool.starmap(memorysort, map_args)
         else:
             for filename in filenames:
-                memorysort(filename, columns)
-        sorted_filename = mergesort(filenames, columns)
+                memorysort(filename, columns, encoding)
+        sorted_filename = mergesort(filenames, columns, encoding=encoding)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
     # generate the final output file
-    with open(output_filename or input_filename, 'w') as output_fp:
+    with open(output_filename or input_filename, 'w', newline='', encoding=encoding) as output_fp:
         writer = csv.writer(output_fp, delimiter=delimiter, quoting=quoting)
         if header:
             writer.writerow(header)
-        with open(sorted_filename) as sorted_fp:
+        with open(sorted_filename, newline='', encoding=encoding) as sorted_fp:
             for row in csv.reader(sorted_fp):
                 writer.writerow(row)
 
@@ -122,13 +127,13 @@ def csvsplit(reader, max_size):
     return split_filenames
 
 
-def memorysort(filename, columns):
+def memorysort(filename, columns, encoding=None):
     """Sort this CSV file in memory on the given columns
     """
-    with open(filename) as input_fp:
+    with open(filename, newline='', encoding=encoding) as input_fp:
         rows = [row for row in csv.reader(input_fp) if row]
     rows.sort(key=lambda row: get_key(row, columns))
-    with open(filename, 'w') as output_fp:
+    with open(filename, 'w', newline='', encoding=encoding) as output_fp:
         writer = csv.writer(output_fp)
         for row in rows:
             writer.writerow(row)
@@ -140,15 +145,15 @@ def get_key(row, columns):
     return [row[column] for column in columns]
 
 
-def decorated_csv(filename, columns):
+def decorated_csv(filename, columns, encoding=None):
     """Iterator to sort CSV rows
     """
-    with open(filename) as fp:
+    with open(filename, newline='', encoding=encoding) as fp:
         for row in csv.reader(fp):
             yield get_key(row, columns), row
 
 
-def mergesort(sorted_filenames, columns, nway=2):
+def mergesort(sorted_filenames, columns, nway=2, encoding=None):
     """Merge these 2 sorted csv files into a single output file
     """
     merge_n = 0
@@ -159,7 +164,7 @@ def mergesort(sorted_filenames, columns, nway=2):
         with tempfile.NamedTemporaryFile(delete=False, mode='w') as output_fp:
             writer = csv.writer(output_fp)
             merge_n += 1
-            for _, row in heapq.merge(*[decorated_csv(filename, columns)
+            for _, row in heapq.merge(*[decorated_csv(filename, columns, encoding)
                                         for filename in merge_filenames]):
                 writer.writerow(row)
 
@@ -197,6 +202,11 @@ def main():
         '--delimiter',
         default=',',
         help='set CSV delimiter (default ",")')
+    parser.add_option(
+        '-e',
+        '--encoding',
+        default=None,
+        help='character encoding (eg utf-8) to use when reading/writing files (default uses system default)')
     args, input_files = parser.parse_args()
 
     if not input_files:
@@ -213,7 +223,8 @@ def main():
             columns=args.columns,
             max_size=args.max_size,
             has_header=args.has_header,
-            delimiter=args.delimiter)
+            delimiter=args.delimiter,
+            encoding=args.encoding)
 
 
 if __name__ == '__main__':
