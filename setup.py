@@ -6,13 +6,13 @@ def read(filename):
 
 setup(
     name='csvsort', 
-    version='1.6',
+    version='1.6.1',
     packages=['csvsort'],
     package_dir={'csvsort' : '.'}, 
     author='Richard Penman',
-    author_email='richard@webscraping.com',
+    author_email='richard.penman@gmail.com',
     description='Sort large CSV files on disk rather than in memory',
     long_description=read('README.rst'),
-    url='https://bitbucket.org/richardpenman/csvsort',
+    url='https://github.com/richardpenman/csvsort',
     license='lgpl',
 )
