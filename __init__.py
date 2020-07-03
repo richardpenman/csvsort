@@ -20,7 +20,9 @@ def csvsort(input_filename,
             show_progress=False,
             parallel=True,
             quoting=csv.QUOTE_MINIMAL,
-            encoding=None):
+            encoding=None,
+            numeric_column=False):
+    
     """Sort the CSV file on disk rather than in memory.
 
     The merge sort algorithm is used to break the file into smaller sub files
@@ -42,6 +44,9 @@ def csvsort(input_filename,
             csv.QUOTE_MINIMAL.
         encoding: The name of the encoding to use when opening or writing the
             csv files. Default is None which uses the system default.
+        numeric_column: If columns being used for sorting are all numeric and  
+            the desired output is to have the sorting be done numerically rather
+            than string based. Default, False, does string-based sorting
     """
 
     with open(input_filename, newline='', encoding=encoding) as input_fp:
@@ -60,12 +65,12 @@ def csvsort(input_filename,
         if parallel:
             concurrency = multiprocessing.cpu_count()
             with multiprocessing.Pool(processes=concurrency) as pool:
-                map_args = [(filename, columns, encoding) for filename in filenames]
+                map_args = [(filename, columns, numeric_column, encoding) for filename in filenames]
                 pool.starmap(memorysort, map_args)
         else:
             for filename in filenames:
-                memorysort(filename, columns, encoding)
-        sorted_filename = mergesort(filenames, columns, encoding=encoding)
+                memorysort(filename, columns, numeric_column, encoding)
+        sorted_filename = mergesort(filenames, columns, numeric_column, encoding=encoding)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
     # generate the final output file
@@ -127,33 +132,36 @@ def csvsplit(reader, max_size):
     return split_filenames
 
 
-def memorysort(filename, columns, encoding=None):
+def memorysort(filename, columns, numeric_column, encoding=None):
     """Sort this CSV file in memory on the given columns
     """
     with open(filename, newline='', encoding=encoding) as input_fp:
         rows = [row for row in csv.reader(input_fp) if row]
-    rows.sort(key=lambda row: get_key(row, columns))
+
+    rows.sort(key=lambda row: get_key(row, columns, numeric_column))
     with open(filename, 'w', newline='', encoding=encoding) as output_fp:
         writer = csv.writer(output_fp)
         for row in rows:
             writer.writerow(row)
 
 
-def get_key(row, columns):
+def get_key(row, columns, numeric_column):
     """Get sort key for this row
     """
-    return [row[column] for column in columns]
+    if(numeric_column):
+        return [float(row[column]) for column in columns]
+    else:
+        return [row[column] for column in columns]
 
-
-def decorated_csv(filename, columns, encoding=None):
+def decorated_csv(filename, columns, numeric_column, encoding=None):
     """Iterator to sort CSV rows
     """
     with open(filename, newline='', encoding=encoding) as fp:
         for row in csv.reader(fp):
-            yield get_key(row, columns), row
+            yield get_key(row, columns, numeric_column), row
 
 
-def mergesort(sorted_filenames, columns, nway=2, encoding=None):
+def mergesort(sorted_filenames, columns, numeric_column, nway=2, encoding=None):
     """Merge these 2 sorted csv files into a single output file
     """
     merge_n = 0
@@ -164,7 +172,7 @@ def mergesort(sorted_filenames, columns, nway=2, encoding=None):
         with tempfile.NamedTemporaryFile(delete=False, mode='w') as output_fp:
             writer = csv.writer(output_fp)
             merge_n += 1
-            for _, row in heapq.merge(*[decorated_csv(filename, columns, encoding)
+            for _, row in heapq.merge(*[decorated_csv(filename, columns, numeric_column, encoding)
                                         for filename in merge_filenames]):
                 writer.writerow(row)
 
