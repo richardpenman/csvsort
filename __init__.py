@@ -1,14 +1,31 @@
 # -*- coding: utf-8 -*-
 
-import csv, heapq, logging, multiprocessing, os, sys, tempfile
+import csv
+import heapq
+import logging
+import multiprocessing
+import os
+import sys
+import tempfile
 if sys.version_info.major == 2:
     from io import open
 from optparse import OptionParser
-csv.field_size_limit(2**30) # can't use sys.maxsize because of Windows error
+csv.field_size_limit(2**30)  # can't use sys.maxsize because of Windows error
 
 
 class CsvSortError(Exception):
     pass
+
+
+def _get_reader(input_filename, csv_reader, encoding, delimiter):
+    """Get the reader instance. This will either open the file, or
+    return the csv_reader supplied by the caller.
+    """
+    if csv_reader:
+        return csv_reader
+
+    with open(input_filename, newline='', encoding=encoding) as input_fp:
+        return csv.reader(input_fp, delimiter=delimiter)
 
 
 def csvsort(input_filename,
@@ -21,8 +38,8 @@ def csvsort(input_filename,
             parallel=True,
             quoting=csv.QUOTE_MINIMAL,
             encoding=None,
-            numeric_column=False):
-    
+            numeric_column=False,
+            csv_reader=None):
     """Sort the CSV file on disk rather than in memory.
 
     The merge sort algorithm is used to break the file into smaller sub files
@@ -44,37 +61,46 @@ def csvsort(input_filename,
             csv.QUOTE_MINIMAL.
         encoding: The name of the encoding to use when opening or writing the
             csv files. Default is None which uses the system default.
-        numeric_column: If columns being used for sorting are all numeric and  
+        numeric_column: If columns being used for sorting are all numeric and
             the desired output is to have the sorting be done numerically rather
             than string based. Default, False, does string-based sorting
+        csv_reader: a pre-loaded instance of `csv.reader`. This allows you to
+            supply a compatible stream for use in sorting.
     """
 
-    with open(input_filename, newline='', encoding=encoding) as input_fp:
-        reader = csv.reader(input_fp, delimiter=delimiter)
-        if has_header:
-            header = next(reader)
-        else:
-            header = None
+    reader = _get_reader(input_filename, csv_reader=csv_reader,
+                         encoding=encoding, delimiter=delimiter)
+    if has_header:
+        header = next(reader)
+    else:
+        header = None
 
-        columns = parse_columns(columns, header)
+    columns = parse_columns(columns, header)
 
-        filenames = csvsplit(reader, max_size)
-        if show_progress:
-            logging.info('Merging %d splits' % len(filenames))
+    filenames = csvsplit(reader, max_size)
+    if show_progress:
+        logging.info('Merging %d splits' % len(filenames))
 
-        if parallel:
-            concurrency = multiprocessing.cpu_count()
-            with multiprocessing.Pool(processes=concurrency) as pool:
-                map_args = [(filename, columns, numeric_column, encoding) for filename in filenames]
-                pool.starmap(memorysort, map_args)
-        else:
-            for filename in filenames:
-                memorysort(filename, columns, numeric_column, encoding)
-        sorted_filename = mergesort(filenames, columns, numeric_column, encoding=encoding)
+    if parallel:
+        concurrency = multiprocessing.cpu_count()
+        with multiprocessing.Pool(processes=concurrency) as pool:
+            map_args = [(filename, columns, numeric_column, encoding)
+                        for filename in filenames]
+            pool.starmap(memorysort, map_args)
+    else:
+        for filename in filenames:
+            memorysort(filename, columns, numeric_column, encoding)
+    sorted_filename = mergesort(filenames,
+                                columns,
+                                numeric_column,
+                                encoding=encoding)
 
     # XXX make more efficient by passing quoting, delimiter, and moving result
     # generate the final output file
-    with open(output_filename or input_filename, 'w', newline='', encoding=encoding) as output_fp:
+    with open(output_filename or input_filename,
+              'w',
+              newline='',
+              encoding=encoding) as output_fp:
         writer = csv.writer(output_fp, delimiter=delimiter, quoting=quoting)
         if header:
             writer.writerow(header)
@@ -148,10 +174,11 @@ def memorysort(filename, columns, numeric_column, encoding=None):
 def get_key(row, columns, numeric_column):
     """Get sort key for this row
     """
-    if(numeric_column):
+    if (numeric_column):
         return [float(row[column]) for column in columns]
     else:
         return [row[column] for column in columns]
+
 
 def decorated_csv(filename, columns, numeric_column, encoding=None):
     """Iterator to sort CSV rows
@@ -161,19 +188,25 @@ def decorated_csv(filename, columns, numeric_column, encoding=None):
             yield get_key(row, columns, numeric_column), row
 
 
-def mergesort(sorted_filenames, columns, numeric_column, nway=2, encoding=None):
+def mergesort(sorted_filenames,
+              columns,
+              numeric_column,
+              nway=2,
+              encoding=None):
     """Merge these 2 sorted csv files into a single output file
     """
     merge_n = 0
     while len(sorted_filenames) > 1:
         merge_filenames, sorted_filenames = \
-           sorted_filenames[:nway], sorted_filenames[nway:]
+            sorted_filenames[:nway], sorted_filenames[nway:]
 
         with tempfile.NamedTemporaryFile(delete=False, mode='w') as output_fp:
             writer = csv.writer(output_fp)
             merge_n += 1
-            for _, row in heapq.merge(*[decorated_csv(filename, columns, numeric_column, encoding)
-                                        for filename in merge_filenames]):
+            for _, row in heapq.merge(*[
+                    decorated_csv(filename, columns, numeric_column, encoding)
+                    for filename in merge_filenames
+            ]):
                 writer.writerow(row)
 
             sorted_filenames.append(output_fp.name)
@@ -185,12 +218,11 @@ def mergesort(sorted_filenames, columns, numeric_column, nway=2, encoding=None):
 
 def main():
     parser = OptionParser()
-    parser.add_option(
-        '-c',
-        '--column',
-        dest='columns',
-        action='append',
-        help='column of CSV to sort on')
+    parser.add_option('-c',
+                      '--column',
+                      dest='columns',
+                      action='append',
+                      help='column of CSV to sort on')
     parser.add_option(
         '-s',
         '--size',
@@ -198,23 +230,22 @@ def main():
         type='float',
         default=100,
         help='maximum size of each split CSV file in MB (default 100)')
-    parser.add_option(
-        '-n',
-        '--no-header',
-        dest='has_header',
-        action='store_false',
-        default=True,
-        help='set CSV file has no header')
-    parser.add_option(
-        '-d',
-        '--delimiter',
-        default=',',
-        help='set CSV delimiter (default ",")')
+    parser.add_option('-n',
+                      '--no-header',
+                      dest='has_header',
+                      action='store_false',
+                      default=True,
+                      help='set CSV file has no header')
+    parser.add_option('-d',
+                      '--delimiter',
+                      default=',',
+                      help='set CSV delimiter (default ",")')
     parser.add_option(
         '-e',
         '--encoding',
         default=None,
-        help='character encoding (eg utf-8) to use when reading/writing files (default uses system default)')
+        help='character encoding (eg utf-8) to use when reading/writing files (default uses system default)'
+    )
     args, input_files = parser.parse_args()
 
     if not input_files:
@@ -224,15 +255,16 @@ def main():
     else:
         # escape backslashes
         args.delimiter = args.delimiter.decode('string_escape')
-        args.columns = [int(column) if column.isdigit() else column
-                        for column in args.columns]
-        csvsort(
-            input_files[0],
-            columns=args.columns,
-            max_size=args.max_size,
-            has_header=args.has_header,
-            delimiter=args.delimiter,
-            encoding=args.encoding)
+        args.columns = [
+            int(column) if column.isdigit() else column
+            for column in args.columns
+        ]
+        csvsort(input_files[0],
+                columns=args.columns,
+                max_size=args.max_size,
+                has_header=args.has_header,
+                delimiter=args.delimiter,
+                encoding=args.encoding)
 
 
 if __name__ == '__main__':
