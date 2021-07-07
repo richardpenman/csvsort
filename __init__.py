@@ -23,10 +23,10 @@ def _get_reader(input_filename, csv_reader, encoding, delimiter):
     return the csv_reader supplied by the caller.
     """
     if csv_reader:
-        return csv_reader
+        return csv_reader, None
 
-    input_fp = open(input_filename, newline='', encoding=encoding)
-    return csv.reader(input_fp, delimiter=delimiter)
+    file_obj = input_fp = open(input_filename, newline='', encoding=encoding)
+    return csv.reader(input_fp, delimiter=delimiter), file_obj
 
 
 def csvsort(input_filename,
@@ -77,8 +77,8 @@ def csvsort(input_filename,
     filenames = []
     for input_filename in input_filenames:
         logging.debug("read file: {}".format(input_filename))
-        reader = _get_reader(input_filename, csv_reader=csv_reader,
-                             encoding=encoding, delimiter=delimiter)
+        reader, file_obj = _get_reader(input_filename, csv_reader=csv_reader,
+                                       encoding=encoding, delimiter=delimiter)
         if has_header:
             header = next(reader)
         else:
@@ -87,6 +87,9 @@ def csvsort(input_filename,
         columns = parse_columns(columns, header)
 
         filenames += csvsplit(reader, max_size)
+
+        if file_obj is not None:
+            file_obj.close()
 
     if show_progress:
         logging.info('Merging %d splits' % len(filenames))
