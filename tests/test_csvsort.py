@@ -11,7 +11,7 @@ logging.info("start unittest")
 class CsvSortTest(unittest.TestCase):
 
     def test_single(self):
-        print("test csvsort single file")
+        logging.info("test csvsort multile file")
         csvsort(
             input_filename=[
                 'tests/students_1.csv',
