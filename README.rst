@@ -37,3 +37,12 @@ Supports python 2 & 3:
     $ pip3 install csvsort
 
 ..
+
+====
+test
+====
+
+.. sourcecode:: bash
+    $ pip3 install -e ./
+    $ python3 -m unittest discover
+..
