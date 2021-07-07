@@ -22,6 +22,9 @@ Example usage
     >>> import csv
     >>> csvsort('test4.csv', [0], quoting=csv.QUOTE_ALL) 
 
+    # sort multi csv files into one
+    >>> csvsort(["test1.csv", "test2.csv", [0], output_filename="test_all.csv")
+
 ..
 
 
