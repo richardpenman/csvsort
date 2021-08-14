@@ -77,7 +77,7 @@ def csvsort(input_filename,
 
     columns = parse_columns(columns, header)
 
-    filenames = csvsplit(reader, max_size)
+    filenames = csvsplit(reader, max_size, encoding)
     if show_progress:
         logging.info('Merging %d splits' % len(filenames))
 
@@ -135,7 +135,7 @@ def parse_columns(columns, header):
     return columns
 
 
-def csvsplit(reader, max_size):
+def csvsplit(reader, max_size, encoding):
     """Split into smaller CSV files of maximum size and return the filenames.
     """
     max_size = max_size * 1024 * 1024  # convert to bytes
@@ -146,7 +146,7 @@ def csvsplit(reader, max_size):
     # break CSV file into smaller merge files
     for row in reader:
         if writer is None:
-            ntf = tempfile.NamedTemporaryFile(delete=False, mode='w')
+            ntf = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding=encoding)
             writer = csv.writer(ntf)
             split_filenames.append(ntf.name)
 
