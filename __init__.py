@@ -146,7 +146,11 @@ def csvsplit(reader, max_size, encoding):
     # break CSV file into smaller merge files
     for row in reader:
         if writer is None:
-            ntf = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding=encoding)
+            ntf = (
+                tempfile.NamedTemporaryFile(delete=False, mode="w", encoding=encoding)
+                if sys.version_info.major >= 3
+                else tempfile.NamedTemporaryFile(delete=False, mode="w")
+            )
             writer = csv.writer(ntf)
             split_filenames.append(ntf.name)
 
