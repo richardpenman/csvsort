@@ -150,8 +150,7 @@ def csvsplit(reader, max_size):
             writer = csv.writer(ntf)
             split_filenames.append(ntf.name)
 
-        writer.writerow(row)
-        current_size += sys.getsizeof(row)
+        current_size += writer.writerow(row)
         if current_size > max_size:
             writer = None
             current_size = 0
