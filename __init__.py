@@ -9,6 +9,7 @@ import sys
 import tempfile
 if sys.version_info.major == 2:
     from io import open
+from collections.abc import Iterable
 from optparse import OptionParser
 csv.field_size_limit(2**30)  # can't use sys.maxsize because of Windows error
 
@@ -22,10 +23,10 @@ def _get_reader(input_filename, csv_reader, encoding, delimiter):
     return the csv_reader supplied by the caller.
     """
     if csv_reader:
-        return csv_reader
+        return csv_reader, None
 
-    with open(input_filename, newline='', encoding=encoding) as input_fp:
-        return csv.reader(input_fp, delimiter=delimiter)
+    file_obj = input_fp = open(input_filename, newline='', encoding=encoding)
+    return csv.reader(input_fp, delimiter=delimiter), file_obj
 
 
 def csvsort(input_filename,
@@ -68,16 +69,28 @@ def csvsort(input_filename,
             supply a compatible stream for use in sorting.
     """
 
-    reader = _get_reader(input_filename, csv_reader=csv_reader,
-                         encoding=encoding, delimiter=delimiter)
-    if has_header:
-        header = next(reader)
+    if isinstance(input_filename, Iterable):
+        input_filenames = input_filename
     else:
-        header = None
+        input_filenames = [input_filename]
 
-    columns = parse_columns(columns, header)
+    filenames = []
+    for input_filename in input_filenames:
+        logging.debug("read file: {}".format(input_filename))
+        reader, file_obj = _get_reader(input_filename, csv_reader=csv_reader,
+                                       encoding=encoding, delimiter=delimiter)
+        if has_header:
+            header = next(reader)
+        else:
+            header = None
 
-    filenames = csvsplit(reader, max_size)
+        columns = parse_columns(columns, header)
+
+        filenames += csvsplit(reader, max_size)
+
+        if file_obj is not None:
+            file_obj.close()
+
     if show_progress:
         logging.info('Merging %d splits' % len(filenames))
 
