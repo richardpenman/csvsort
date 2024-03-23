@@ -22,6 +22,9 @@ Example usage
     >>> import csv
     >>> csvsort('test4.csv', [0], quoting=csv.QUOTE_ALL) 
 
+    # sort multi csv files into one
+    >>> csvsort(["test1.csv", "test2.csv", [0], output_filename="test_all.csv")
+
 ..
 
 
@@ -36,4 +39,13 @@ Supports python 2 & 3:
     $ pip install csvsort
     $ pip3 install csvsort
 
+..
+
+====
+test
+====
+
+.. sourcecode:: bash
+    $ pip3 install -e ./
+    $ python3 -m unittest discover
 ..
